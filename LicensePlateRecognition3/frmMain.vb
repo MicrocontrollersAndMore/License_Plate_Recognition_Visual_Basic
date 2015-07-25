@@ -15,14 +15,11 @@ Imports Emgu.CV                     '
 Imports Emgu.CV.CvEnum              'Emgu Cv imports
 Imports Emgu.CV.Structure           '
 Imports Emgu.CV.UI                  '
+Imports Emgu.CV.OCR
 
 '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 Public Class frmMain
-
-    ' class level variables ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
     
-
-
     '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
     Private Sub btnOpenFile_Click( sender As Object,  e As EventArgs) Handles btnOpenFile.Click
         Dim drChosenFile As DialogResult
@@ -52,10 +49,54 @@ Public Class frmMain
         
         ibOriginal.Image = imgOriginal
 
+        Dim imgListOfPlates As List(Of Image(Of Bgr, Byte)) = DetectPlates.detectPlates(imgOriginal)
+
+        Dim intPlateCounter As Integer = 0
+
+        If (imgListOfPlates Is Nothing) Then
+            txtInfo.AppendText(vbCrLf + "no license plates were detected" + vbCrLf)
+        ElseIf (imgListOfPlates.Count = 0) Then
+            txtInfo.AppendText(vbCrLf + "no license plates were detected" + vbCrLf)
+        Else
+            txtInfo.AppendText(vbCrLf + "plate detection complete, " + imgListOfPlates.Count.ToString + " possible plates found" + vbCrLf)
+
+            For Each imgPlate As Image(Of Bgr, Byte) In imgListOfPlates
+                Dim imgGrayscale As Image(Of Gray, Byte) = Nothing
+                Dim imgThresh As Image(Of Gray, Byte) = Nothing
+                
+                Preprocess.preprocess(imgPlate, imgGrayscale, imgThresh)
+
+                imgThresh = imgThresh.Resize(1.6, INTER.CV_INTER_LINEAR)
+
+                CvInvoke.cvShowImage("imgThresh" + intPlateCounter.ToString, imgThresh)
+                CvInvoke.cvSaveImage("imgThresh" + intPlateCounter.ToString + ".png", imgThresh, Nothing)
+
+                'Dim strLicPlateChars As String = ReadCharacters.readCharacters(imgThresh)
+
+                'Dim tess As Tesseract
+
+                'Try
+                '    tess = New Tesseract("tessdata", "eng", Tesseract.OcrEngineMode.OEM_DEFAULT)
+                'Catch ex As Exception
+                '    txtInfo.AppendText(vbCrLf + "ERROR INSTANTIATING TESSERACT OBJECT" + vbCrLf)
+                '    Return
+                'End Try
+                
+                'tess.Recognize(imgThresh)
+                
+                'Dim strLicPlateChars As String = tess.GetText()
+
+                'txtInfo.AppendText(vbCrLf + "License Plate Characters are " + strLicPlateChars + vbCrLf)
+
+                intPlateCounter = intPlateCounter + 1
+            Next
+            
+        End If
     End Sub
-
-
-
-
+    
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    Private Sub frmMain_FormClosing( sender As Object,  e As FormClosingEventArgs) Handles MyBase.FormClosing
+        '
+    End Sub
 
 End Class

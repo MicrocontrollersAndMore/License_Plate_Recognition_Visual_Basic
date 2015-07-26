@@ -12,21 +12,20 @@ Imports Emgu.CV.UI                  '
 Module Preprocess
 
     ' module level variables ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-    Const SMOOTH_FILTER_SIZE As Integer = 5
+    Const GAUSSIAN_SMOOTH_FILTER_SIZE As Integer = 5
     Const ADAPTIVE_THRESH_BLOCK_SIZE As Integer = 19
     Const ADAPTIVE_THRESH_WEIGHT As Integer = 9
 
     '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
     Sub preprocess(imgOriginal As Image(Of Bgr, Byte), ByRef imgGrayscale As Image(Of Gray, Byte), ByRef imgThresh As Image(Of Gray, Byte))
-
+        
         imgGrayscale = extractValue(imgOriginal)
 
         Dim imgMaxContrastGrayscale As Image(Of Gray, Byte) = maximizeContrast(imgGrayscale)
 
-        Dim imgBlurred As Image(Of Gray, Byte) = imgMaxContrastGrayscale.SmoothGaussian(SMOOTH_FILTER_SIZE)
+        Dim imgBlurred As Image(Of Gray, Byte) = imgMaxContrastGrayscale.SmoothGaussian(GAUSSIAN_SMOOTH_FILTER_SIZE)
 
         imgThresh = imgBlurred.ThresholdAdaptive(New Gray(255), ADAPTIVE_THRESHOLD_TYPE.CV_ADAPTIVE_THRESH_GAUSSIAN_C, THRESH.CV_THRESH_BINARY_INV, ADAPTIVE_THRESH_BLOCK_SIZE, New Gray(ADAPTIVE_THRESH_WEIGHT))
-
     End Sub
 
     '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
@@ -57,15 +56,3 @@ Module Preprocess
     End Function
 
 End Module
-
-
-
-
-
-
-
-
-
-
-
-

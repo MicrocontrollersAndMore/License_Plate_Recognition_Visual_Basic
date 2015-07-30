@@ -57,53 +57,52 @@ Public Class frmMain
 
         listOfPossiblePlates = DetectPlates.detectPlates(imgOriginal)
 
+        Dim blnKNNTrainingSuccessful As Boolean = loadKNNDataAndTrainKNN()
+
+        If (blnKNNTrainingSuccessful = False) Then
+            txtInfo.AppendText(vbCrLf + "error: KNN traning was not successful" + vbCrLf)
+            Return
+        End If
+
+        listOfPossiblePlates = DetectChars.detectChars(listOfPossiblePlates)
+
         If (listOfPossiblePlates Is Nothing) Then
             txtInfo.AppendText(vbCrLf + "no license plates were detected" + vbCrLf)
         ElseIf (listOfPossiblePlates.Count = 0) Then
             txtInfo.AppendText(vbCrLf + "no license plates were detected" + vbCrLf)
         Else
-            'txtInfo.AppendText(vbCrLf + "plate detection complete, " + listOfPossiblePlates.Count.ToString + " possible plates found" + vbCrLf)
+                    'if we get in here list of possible plates has at leat one plate
 
-            Dim blnKNNTrainingSuccessful = loadKNNDataAndTrainKNN()
-
-            If (blnKNNTrainingSuccessful = False) Then
-                txtInfo.AppendText(vbCrLf + "error: KNN traning was not successful" + vbCrLf)
-                Return
-            End If
-
-            For Each possiblePlate As PossiblePlate In listOfPossiblePlates
-                Preprocess.preprocess(possiblePlate.imgPlate, possiblePlate.imgGrayscale, possiblePlate.imgThresh)
-                
-                possiblePlate.imgThresh = possiblePlate.imgThresh.Resize(1.6, INTER.CV_INTER_LINEAR)            'increase size of plate image for easier viewing and char detection
-
-                'CvInvoke.cvShowImage("imgThresh" + i.ToString, listOfPossiblePlates(i).imgThresh)
-                'CvInvoke.cvSaveImage("imgThresh" + i.ToString + ".png", listOfPossiblePlates(i).imgThresh, Nothing)
-
-                possiblePlate.strChars = getCharsFromPlate(possiblePlate.imgThresh)
-
-                'If possiblePlate.strChars = "" Then
-                '    Continue For
-                'End If
-
-                'txtInfo.AppendText(vbCrLf + "license plate read from image = " + possiblePlate.strChars + vbCrLf)
-            Next
-
-                                            'sort plates from most # of chars to least # of chars
+                                'sort the list of possible plates in DESCENDING order (most number of chars to least number of chars)
             listOfPossiblePlates.Sort(Function(onePlate, otherPlate) otherPlate.strChars.Length.CompareTo(onePlate.strChars.Length))
 
-            Dim licPlate As PossiblePlate = listOfPossiblePlates(0)         'suppose the possible plate with the most # of chars is the plate
+                                                                            'suppose the plate with the most recognized chars
+            Dim licPlate As PossiblePlate = listOfPossiblePlates(0)         '(the first plate in sorted by string length descending order)
+                                                                            'is the actual plate
 
-            CvInvoke.cvShowImage("name here later", licPlate.imgPlate)
-            CvInvoke.cvShowImage("name here later2", licPlate.imgThresh)
-            CvInvoke.cvSaveImage("imgThresh.png", licPlate.imgThresh, Nothing)
-
-            If (licPlate.strChars.Length = 0) Then
-                txtInfo.AppendText(vbCrLf + "no characters were detected" + licPlate.strChars + vbCrLf)
-                Return
+            CvInvoke.cvShowImage("final imgPlate", licPlate.imgPlate)              'show the final color plate image 
+            CvInvoke.cvShowImage("final imgThresh", licPlate.imgThresh)            'show the final thresh plate image
+            CvInvoke.cvSaveImage("imgThresh.png", licPlate.imgThresh, Nothing)      'save thresh image to file
+            
+            If (licPlate.strChars.Length = 0) Then                                                          'if no chars are present in the lic plate,
+                txtInfo.AppendText(vbCrLf + "no characters were detected" + licPlate.strChars + vbCrLf)     'update info text box
+                Return                                                                                      'and return
             End If
 
-            txtInfo.AppendText(vbCrLf + "license plate read from image = " + licPlate.strChars + vbCrLf)
+            imgOriginal.Draw(licPlate.b2dLocationOfPlateInScene, New Bgr(Color.Red), 2)         'draw red rectangle around plate
 
+            txtInfo.AppendText(vbCrLf + "license plate read from image = " + licPlate.strChars + vbCrLf)        'update info text box with license plate read
+            
+                                'choose point to start writing chars
+            Dim ptBottomLeftOfFirstChar As New Point(CInt(licPlate.b2dLocationOfPlateInScene.center.X - licPlate.b2dLocationOfPlateInScene.size.Width / 2.0), _
+                                                     CInt(licPlate.b2dLocationOfPlateInScene.center.Y + (licPlate.b2dLocationOfPlateInScene.size.Height * 1.5)))
+
+            Dim font As MCvFont = New MCvFont(CvEnum.FONT.CV_FONT_HERSHEY_SIMPLEX, 2.0, 2.0)        'use plane jane font
+            font.thickness = 3                                                                      'make text bold
+
+            imgOriginal.Draw(licPlate.strChars, font, ptBottomLeftOfFirstChar, New Bgr(Color.Yellow))       'write text of license plate on the image
+
+            ibOriginal.Image = imgOriginal              'update form with updated original image
         End If
 
     End Sub

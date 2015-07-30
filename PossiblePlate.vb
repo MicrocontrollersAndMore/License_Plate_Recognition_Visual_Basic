@@ -16,7 +16,19 @@ Public Class PossiblePlate
     Public imgGrayscale As Image(Of Gray, Byte)
     Public imgThresh As Image(Of Gray, Byte)
 
+    Public b2dLocationOfPlateInScene As MCvBox2D
+
     Public strChars As String
+
+    ' constructor '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    Sub New
+                                'initialize values
+        imgPlate = Nothing
+        imgGrayscale = Nothing
+        imgThresh = Nothing
+
+        strChars = ""
+    End Sub
 
 End Class
 

@@ -127,7 +127,7 @@ Public Class PossibleChar
         
         Dim dblAngleInRad As Double = Math.Asin(dblOpp / dblHyp) 
 
-        Dim dblAngleInDeg As Double = dblAngleInRad * (180.0 / 3.14159)
+        Dim dblAngleInDeg As Double = dblAngleInRad * (180.0 / Math.PI)
 
         Return dblAngleInDeg
     End Function

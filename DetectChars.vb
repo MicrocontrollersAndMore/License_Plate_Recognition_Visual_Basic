@@ -29,31 +29,131 @@ Module DetectChars
     Const MIN_DIST_BETWEEN_CHARS_FACTOR = 0.3
 
     '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-    Function findPossibleChars(imgGrayscale As Image(Of Gray, Byte), imgThresh As Image(Of Gray, Byte)) As List(Of PossibleChar)
-        Dim contours As Contour(Of Point) = imgThresh.FindContours(CHAIN_APPROX_METHOD.CV_CHAIN_APPROX_SIMPLE, RETR_TYPE.CV_RETR_LIST)
+    Function detectChars(listOfPossiblePlates As List(Of PossiblePlate)) As List(Of PossiblePlate)
 
-        Dim listOfPossibleChars As List(Of PossibleChar) = New List(Of PossibleChar)()      'this is the return value
+        If (listOfPossiblePlates Is Nothing) Then           'if list of possible plates is null,
+            Return listOfPossiblePlates                     'return
+        ElseIf (listOfPossiblePlates.Count = 0) Then        'if list of possible plates has zero plates
+            Return listOfPossiblePlates                     'return
+        End If
+                        'at this point we can be sure list of possible plates has at least one plate
 
-        Dim intCountOfPossibleChars As Integer = 0
-        Dim intCountOfValidPossibleChars As Integer = 0
+        For Each possiblePlate As PossiblePlate In listOfPossiblePlates
+            Preprocess.preprocess(possiblePlate.imgPlate, possiblePlate.imgGrayscale, possiblePlate.imgThresh)
 
-        While (Not contours Is Nothing)
-            intCountOfPossibleChars = intCountOfPossibleChars + 1
-            Dim contour As Contour(Of Point) = contours.ApproxPoly(contours.Perimeter * 0.0001)
-            Dim possibleChar As PossibleChar = New PossibleChar(contour)
+            possiblePlate.imgThresh = possiblePlate.imgThresh.Resize(1.6, INTER.CV_INTER_LINEAR)            'increase size of plate image for easier viewing and char detection
+            
+                        'threshold image to only black or white (eliminate grayscale)
+            CvInvoke.cvThreshold(possiblePlate.imgThresh, possiblePlate.imgThresh, 0, 255, THRESH.CV_THRESH_BINARY Or THRESH.CV_THRESH_OTSU)
 
-            If (possibleChar.checkIfValidAndPopulateData(imgGrayscale)) Then
-                intCountOfValidPossibleChars = intCountOfValidPossibleChars + 1
-                listOfPossibleChars.Add(possibleChar)
+            Dim listOfPossibleChars As List(Of PossibleChar) = findPossibleCharsInPlate(possiblePlate.imgGrayscale, possiblePlate.imgThresh)
+
+            If (frmMain.ckbShowSteps.Checked = True) Then
+                Dim imgContours As Image(Of Gray, Byte) = New Image(Of Gray, Byte)(possiblePlate.imgThresh.Size())
+
+                For Each possibleChar As PossibleChar In listOfPossibleChars
+                    CvInvoke.cvDrawContours(imgContours, possibleChar.contour, New MCvScalar(255), New MCvScalar(255), 100, 1, LINE_TYPE.CV_AA, New Point(0, 0))
+                Next
+                CvInvoke.cvShowImage("listOfPossibleChars", imgContours)
             End If
 
-            contours = contours.HNext
+            Dim listOfListsOfMatchingChars As List(Of List(Of PossibleChar)) = findListOfListsOfMatchingChars(listOfPossibleChars)
+
+            If (listOfListsOfMatchingChars Is Nothing) Then
+                possiblePlate.strChars = ""
+                Continue For
+            ElseIf (listOfListsOfMatchingChars.Count = 0) Then
+                possiblePlate.strChars = ""
+                Continue For
+            End If
+
+            For i As Integer = 0 To listOfListsOfMatchingChars.Count - 1
+                listOfListsOfMatchingChars(i).Sort(Function(oneChar, otherChar) oneChar.boundingRect.X.CompareTo(otherChar.boundingRect.X))
+                listOfListsOfMatchingChars(i) = removeInnerOverlappingChars(listOfListsOfMatchingChars(i))
+            Next
+
+                    'within each possible plate, suppose the longest list of potential matching chars is the actual list of chars
+
+            Dim intLenOfLongestListOfChars As Integer = 0
+            Dim intIndexOfLongestListOfChars As Integer = 0
+
+            For i As Integer = 0 To listOfListsOfMatchingChars.Count - 1                         'find index of longest list of matching chars,
+                If (listOfListsOfMatchingChars(i).Count > intLenOfLongestListOfChars) Then       'we will suppose this is the "best" or "correct" list of chars
+                    intLenOfLongestListOfChars = listOfListsOfMatchingChars(i).Count
+                    intIndexOfLongestListOfChars = i
+                End If
+            Next
+
+            Dim longestListOfMatchingChars As List(Of PossibleChar) = listOfListsOfMatchingChars(intIndexOfLongestListOfChars)
+
+            possiblePlate.strChars = recognizeChars(possiblePlate.imgThresh, longestListOfMatchingChars)
+        Next
+
+        Return listOfPossiblePlates
+    End Function
+
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    Function findPossibleCharsInPlate(imgGrayscale As Image(Of Gray, Byte), imgThresh As Image(Of Gray, Byte)) As List(Of PossibleChar)
+        
+        Dim listOfPossibleChars As List(Of PossibleChar) = New List(Of PossibleChar)        'this will be the return value
+
+        Dim imgThreshCopy As Image(Of Gray, Byte)
+        Dim imgContours As Image(Of Gray, Byte)
+
+        Dim contours As Contour(Of Point)
+                                                'threshold image to only black or white (eliminate grayscale)
+        CvInvoke.cvThreshold(imgThresh, imgThresh, 0, 255, THRESH.CV_THRESH_BINARY Or THRESH.CV_THRESH_OTSU)
+
+        If (frmMain.ckbShowSteps.Checked = True) Then
+            CvInvoke.cvShowImage("imgThresh before finding contours", imgThresh)
+        End If
+
+        imgThreshCopy = imgThresh.Clone()       'make a copy of the thresh image, this in necessary b/c findContours modifies the image
+
+        contours = imgThreshCopy.FindContours(CHAIN_APPROX_METHOD.CV_CHAIN_APPROX_SIMPLE, RETR_TYPE.CV_RETR_LIST)
+
+        Dim listOfContours As List(Of Contour(Of Point)) = New List(Of Contour(Of Point))()             'declare a list of contours and a list of valid contours,
+        Dim listOfValidContours As List(Of Contour(Of Point)) = New List(Of Contour(Of Point))()        'this is necessary for removing invalid contours and sorting from left to right
+        
+                                        'populate list of contours
+        While (Not contours Is Nothing)                                                     'for each contour
+            Dim contour As Contour(Of Point) = contours.ApproxPoly(contours.Perimeter * 0.0001)         'get the current contour, note that the lower the multiplier, the higher the precision
+            listOfContours.Add(contour)                                                                 'add to list of contours
+            contours = contours.HNext                                                                   'move on to next contour
         End While
 
-        If (frmMain.ckbShowSteps.Checked) Then
-            frmMain.txtInfo.AppendText("intCountOfPossibleChars = " + intCountOfPossibleChars.ToString + vbCrLf)                 '2115 with MCLRNF1 image
-            frmMain.txtInfo.AppendText("intCountOfValidPossibleChars = " + intCountOfValidPossibleChars.ToString + vbCrLf)       '289 with MCLRNF1 image
+        If (frmMain.ckbShowSteps.Checked = True) Then
+            imgContours = New Image(Of Gray, Byte)(imgThresh.Size())
+
+            For Each contour As Contour(Of Point) In listOfContours
+                CvInvoke.cvDrawContours(imgContours, contour, New MCvScalar(255), New MCvScalar(255), 100, 1, LINE_TYPE.CV_AA, New Point(0, 0))
+            Next
+            CvInvoke.cvShowImage("imgContours1", imgContours)
         End If
+                                        'this next loop removes the invalid contours
+        For Each contour As Contour(Of Point) In listOfContours                 'for each contour
+            If (contour.Area >= MIN_CONTOUR_AREA) Then                          'if contour is valid
+                listOfValidContours.Add(contour)                                'add to list of valid contours
+            End If
+        Next
+                                        'sort contours from left to right
+        listOfValidContours.Sort(Function(oneContour, otherContour) oneContour.BoundingRectangle.X.CompareTo(otherContour.BoundingRectangle.X))
+
+        If (frmMain.ckbShowSteps.Checked = True) Then
+            imgContours = New Image(Of Gray, Byte)(imgThresh.Size())
+
+            For Each contour As Contour(Of Point) In listOfValidContours
+                CvInvoke.cvDrawContours(imgContours, contour, New MCvScalar(255), New MCvScalar(255), 100, 1, LINE_TYPE.CV_AA, New Point(0, 0))
+            Next
+            CvInvoke.cvShowImage("listOfValidContours", imgContours)
+        End If
+
+        For Each contour As Contour(Of Point) In listOfValidContours
+            Dim possibleChar As PossibleChar = New PossibleChar(contour)
+            If (possibleChar.checkIfValidAndPopulateData(imgThresh)) Then
+                listOfPossibleChars.Add(possibleChar)
+            End If
+        Next
 
         Return listOfPossibleChars
     End Function
@@ -92,7 +192,78 @@ Module DetectChars
         Next
         
         Return listOfListsOfMatchingChars
+    End Function
 
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    Function removeInnerOverlappingChars(listOfMatchingChars As List(Of PossibleChar)) As List(Of PossibleChar)
+        
+        Dim listOfMatchingCharsWithInnerCharRemoved As List(Of PossibleChar) = New List(Of PossibleChar)(listOfMatchingChars)
+
+        For Each currentChar As PossibleChar In listOfMatchingChars
+            For Each otherChar As PossibleChar In listOfMatchingChars
+                If (Not currentChar.Equals(otherChar)) Then                                     'if current char and other char are not the same char . . .
+                                                                                                'if current char and other char have center points at almost the same location . . .
+                    If (currentChar.distanceTo(otherChar) < currentChar.dblDiagonalSize * MIN_DIST_BETWEEN_CHARS_FACTOR) Then
+                                        'if we get in here we have found overlapping chars
+                                        'next we identify which char is smaller, then if that char was not already removed on a previous pass, remove it
+                        If (currentChar.lngArea < otherChar.lngArea) Then                               'if current char is smaller than other char
+                            If (listOfMatchingCharsWithInnerCharRemoved.Contains(currentChar)) Then     'if current char was not already removed on a previous pass . . .
+                                listOfMatchingCharsWithInnerCharRemoved.Remove(currentChar)             'then remove current char
+                            End If
+                        Else                                                                            'else if other char is smaller than current char
+                            If (listOfMatchingCharsWithInnerCharRemoved.Contains(otherChar)) Then       'if other char was not already removed on a previous pass . . .
+                                listOfMatchingCharsWithInnerCharRemoved.Remove(otherChar)               'then remove other char
+                            End If
+
+                        End If
+                    End If
+                End If
+            Next
+        Next
+
+        Return listOfMatchingCharsWithInnerCharRemoved
+    End Function
+
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    Function recognizeChars(imgThresh As Image(Of Gray, Byte), listOfMatchingChars As List(Of PossibleChar)) As String
+        Dim strChars As String = ""         'this will be the return value, the chars in the lic plate
+
+        Dim imgThreshColor As Image(Of Bgr, Byte)
+        
+        listOfMatchingChars.Sort(Function(oneChar, otherChar) oneChar.boundingRect.X.CompareTo(otherChar.boundingRect.X))
+
+        imgThreshColor = imgThresh.Convert(Of Bgr, Byte)()
+
+        For Each currentChar As PossibleChar In listOfMatchingChars
+            imgThreshColor.Draw(currentChar.boundingRect, New Bgr(Color.Green), 2)
+
+            Dim imgROI As Image(Of Gray, Byte) = imgThresh.Copy(currentChar.boundingRect)
+
+            Dim imgROIResized As Image(Of Gray, Byte) = imgROI.Resize(RESIZED_CHAR_IMAGE_WIDTH, RESIZED_CHAR_IMAGE_HEIGHT, INTER.CV_INTER_LINEAR)
+
+            Dim mtxTemp As Matrix(Of Single) = New Matrix(Of Single)(imgROIResized.Size())
+            Dim mtxTempReshaped As Matrix(Of Single) = New Matrix(Of Single)(1, RESIZED_CHAR_IMAGE_WIDTH * RESIZED_CHAR_IMAGE_HEIGHT)
+
+            CvInvoke.cvConvert(imgROIResized, mtxTemp)
+
+            For intRow As Integer = 0 To RESIZED_CHAR_IMAGE_HEIGHT - 1       'flatten Matrix into one row by RESIZED_IMAGE_WIDTH * RESIZED_IMAGE_HEIGHT number of columns
+                For intCol As Integer = 0 To RESIZED_CHAR_IMAGE_WIDTH - 1
+                    mtxTempReshaped(0, (intRow * RESIZED_CHAR_IMAGE_WIDTH) + intCol) = mtxTemp(intRow, intCol)
+                Next
+            Next
+
+            Dim sngCurrentChar As Single = kNearest.FindNearest(mtxTempReshaped, 1, Nothing, Nothing, Nothing, Nothing)
+
+            strChars = strChars + Chr(Convert.ToInt32(sngCurrentChar))
+        Next
+        
+        If (frmMain.ckbShowSteps.Checked = True) Then
+            CvInvoke.cvShowImage("imgTestingNumbers", imgThreshColor)        'show input image with green boxes drawn around found digits
+            frmMain.txtInfo.AppendText(vbCrLf + "showing images, press a key to continue . . . " + vbCrLf)
+            CvInvoke.cvWaitKey(0)
+        End If
+
+        Return strChars
     End Function
 
     '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
@@ -161,181 +332,6 @@ Module DetectChars
         kNearest.Train(mtxTrainingImages, mtxClassifications, Nothing, False, 3, False)       'call to train
 
         Return True
-    End Function
-
-    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-    Function getCharsFromPlate(imgThresh As Image(Of Gray, Byte)) As String
-
-        Dim imgThreshCopy As Image(Of Gray, Byte)
-        Dim imgContours As Image(Of Gray, Byte)
-        Dim imgThreshColor As Image(Of Bgr, Byte)
-
-        Dim contours As Contour(Of Point)
-                                                'threshold image to only black or white (eliminate grayscale)
-        CvInvoke.cvThreshold(imgThresh, imgThresh, 0, 255, THRESH.CV_THRESH_BINARY Or THRESH.CV_THRESH_OTSU)
-
-        If (frmMain.ckbShowSteps.Checked = True) Then
-            CvInvoke.cvShowImage("imgThresh before finding contours", imgThresh)
-        End If
-
-        imgThreshCopy = imgThresh.Clone()       'make a copy of the thresh image, this in necessary b/c findContours modifies the image
-
-        contours = imgThreshCopy.FindContours(CHAIN_APPROX_METHOD.CV_CHAIN_APPROX_SIMPLE, RETR_TYPE.CV_RETR_LIST)
-
-        Dim listOfContours As List(Of Contour(Of Point)) = New List(Of Contour(Of Point))()             'declare a list of contours and a list of valid contours,
-        Dim listOfValidContours As List(Of Contour(Of Point)) = New List(Of Contour(Of Point))()        'this is necessary for removing invalid contours and sorting from left to right
-        
-                                        'populate list of contours
-        While (Not contours Is Nothing)                                                     'for each contour
-            Dim contour As Contour(Of Point) = contours.ApproxPoly(contours.Perimeter * 0.0001)         'get the current contour, note that the lower the multiplier, the higher the precision
-            listOfContours.Add(contour)                                                                 'add to list of contours
-            contours = contours.HNext                                                                   'move on to next contour
-        End While
-
-        If (frmMain.ckbShowSteps.Checked = True) Then
-            imgContours = New Image(Of Gray, Byte)(imgThresh.Size())
-
-            For Each contour As Contour(Of Point) In listOfContours
-                CvInvoke.cvDrawContours(imgContours, contour, New MCvScalar(255), New MCvScalar(255), 100, 1, LINE_TYPE.CV_AA, New Point(0, 0))
-            Next
-            CvInvoke.cvShowImage("imgContours1", imgContours)
-        End If
-                                        'this next loop removes the invalid contours
-        For Each contour As Contour(Of Point) In listOfContours                 'for each contour
-            If (contour.Area >= MIN_CONTOUR_AREA) Then                          'if contour is valid
-                listOfValidContours.Add(contour)                                'add to list of valid contours
-            End If
-        Next
-                                        'sort contours from left to right
-        listOfValidContours.Sort(Function(oneContour, otherContour) oneContour.BoundingRectangle.X.CompareTo(otherContour.BoundingRectangle.X))
-
-        If (frmMain.ckbShowSteps.Checked = True) Then
-            imgContours = New Image(Of Gray, Byte)(imgThresh.Size())
-
-            For Each contour As Contour(Of Point) In listOfValidContours
-                CvInvoke.cvDrawContours(imgContours, contour, New MCvScalar(255), New MCvScalar(255), 100, 1, LINE_TYPE.CV_AA, New Point(0, 0))
-            Next
-            CvInvoke.cvShowImage("listOfValidContours", imgContours)
-        End If
-        
-        Dim listOfPossibleChars As List(Of PossibleChar) = New List(Of PossibleChar)
-
-        For Each contour As Contour(Of Point) In listOfValidContours
-            Dim possibleChar As PossibleChar = New PossibleChar(contour)
-            If (possibleChar.checkIfValidAndPopulateData(imgThresh)) Then
-                listOfPossibleChars.Add(possibleChar)
-            End If
-        Next
-
-        If (frmMain.ckbShowSteps.Checked = True) Then
-            imgContours = New Image(Of Gray, Byte)(imgThresh.Size())
-
-            For Each possibleChar As PossibleChar In listOfPossibleChars
-                CvInvoke.cvDrawContours(imgContours, possibleChar.contour, New MCvScalar(255), New MCvScalar(255), 100, 1, LINE_TYPE.CV_AA, New Point(0, 0))
-            Next
-            CvInvoke.cvShowImage("listOfPossibleChars", imgContours)
-        End If
-
-        Dim listOfListsOfMatchingChars As List(Of List(Of PossibleChar)) = findListOfListsOfMatchingChars(listOfPossibleChars)
-
-        If (listOfListsOfMatchingChars Is Nothing) Then
-            Return ""
-        ElseIf (listOfListsOfMatchingChars.Count = 0) Then
-            Return ""
-        End If
-
-        'For Each listOfMatchingChars As List(Of PossibleChar) In listOfListsOfMatchingChars
-        For i As Integer = 0 To listOfListsOfMatchingChars.Count - 1
-            listOfListsOfMatchingChars(i).Sort(Function(oneChar, otherChar) oneChar.boundingRect.X.CompareTo(otherChar.boundingRect.X))
-            listOfListsOfMatchingChars(i) = removeInnerOverlappingChars(listOfListsOfMatchingChars(i))
-        Next
-
-        Dim intLenOfLongestListOfChars As Integer = 0
-        Dim intIndexOfLongestListOfChars As Integer = 0
-
-        For i As Integer = 0 To listOfListsOfMatchingChars.Count - 1                         'find index of longest list of matching chars,
-            If (listOfListsOfMatchingChars(i).Count > intLenOfLongestListOfChars) Then       'we will suppose this is the "best" or "correct" list of chars
-                intLenOfLongestListOfChars = listOfListsOfMatchingChars(i).Count
-                intIndexOfLongestListOfChars = i
-            End If
-        Next
-
-        Dim longestListOfMatchingChars As List(Of PossibleChar) = listOfListsOfMatchingChars(intIndexOfLongestListOfChars)
-
-        longestListOfMatchingChars.Sort(Function(oneChar, otherChar) oneChar.boundingRect.X.CompareTo(otherChar.boundingRect.X))
-
-        If (frmMain.ckbShowSteps.Checked = True) Then
-            imgContours = New Image(Of Gray, Byte)(imgThresh.Size())
-            For Each currentChar As PossibleChar In longestListOfMatchingChars
-                CvInvoke.cvDrawContours(imgContours, currentChar.contour, New MCvScalar(255), New MCvScalar(255), 100, 1, LINE_TYPE.CV_AA, New Point(0, 0))
-            Next
-            CvInvoke.cvShowImage("imgContours3", imgContours)
-        End If
-
-        Dim strFinalString As String = ""
-
-        imgThreshColor = imgThresh.Convert(Of Bgr, Byte)()
-
-        For Each currentChar As PossibleChar In longestListOfMatchingChars
-            imgThreshColor.Draw(currentChar.boundingRect, New Bgr(Color.Green), 2)
-
-            Dim imgROI As Image(Of Gray, Byte) = imgThresh.Copy(currentChar.boundingRect)
-
-            Dim imgROIResized As Image(Of Gray, Byte) = imgROI.Resize(RESIZED_CHAR_IMAGE_WIDTH, RESIZED_CHAR_IMAGE_HEIGHT, INTER.CV_INTER_LINEAR)
-
-            Dim mtxTemp As Matrix(Of Single) = New Matrix(Of Single)(imgROIResized.Size())
-            Dim mtxTempReshaped As Matrix(Of Single) = New Matrix(Of Single)(1, RESIZED_CHAR_IMAGE_WIDTH * RESIZED_CHAR_IMAGE_HEIGHT)
-
-            CvInvoke.cvConvert(imgROIResized, mtxTemp)
-
-            For intRow As Integer = 0 To RESIZED_CHAR_IMAGE_HEIGHT - 1       'flatten Matrix into one row by RESIZED_IMAGE_WIDTH * RESIZED_IMAGE_HEIGHT number of columns
-                For intCol As Integer = 0 To RESIZED_CHAR_IMAGE_WIDTH - 1
-                    mtxTempReshaped(0, (intRow * RESIZED_CHAR_IMAGE_WIDTH) + intCol) = mtxTemp(intRow, intCol)
-                Next
-            Next
-
-            Dim sngCurrentChar As Single = kNearest.FindNearest(mtxTempReshaped, 1, Nothing, Nothing, Nothing, Nothing)
-
-            strFinalString = strFinalString + Chr(Convert.ToInt32(sngCurrentChar))
-        Next
-        
-        If (frmMain.ckbShowSteps.Checked = True) Then
-            CvInvoke.cvShowImage("imgTestingNumbers", imgThreshColor)        'show input image with green boxes drawn around found digits
-            frmMain.txtInfo.AppendText(vbCrLf + "showing images, press a key to continue . . . " + vbCrLf)
-            CvInvoke.cvWaitKey(0)
-        End If
-
-        Return strFinalString
-    End Function
-
-    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-    Function removeInnerOverlappingChars(listOfMatchingChars As List(Of PossibleChar)) As List(Of PossibleChar)
-        
-        Dim listOfMatchingCharsWithInnerCharRemoved As List(Of PossibleChar) = New List(Of PossibleChar)(listOfMatchingChars)
-
-        For Each currentChar As PossibleChar In listOfMatchingChars
-            For Each otherChar As PossibleChar In listOfMatchingChars
-                If (Not currentChar.Equals(otherChar)) Then                                     'if current char and other char are not the same char . . .
-                                                                                                'if current char and other char have center points at almost the same location . . .
-                    If (currentChar.distanceTo(otherChar) < currentChar.dblDiagonalSize * MIN_DIST_BETWEEN_CHARS_FACTOR) Then
-                                        'if we get in here we have found overlapping chars
-                                        'next we identify which char is smaller, then if that char was not already removed on a previous pass, remove it
-                        If (currentChar.lngArea < otherChar.lngArea) Then                               'if current char is smaller than other char
-                            If (listOfMatchingCharsWithInnerCharRemoved.Contains(currentChar)) Then     'if current char was not already removed on a previous pass . . .
-                                listOfMatchingCharsWithInnerCharRemoved.Remove(currentChar)             'then remove current char
-                            End If
-                        Else                                                                            'else if other char is smaller than current char
-                            If (listOfMatchingCharsWithInnerCharRemoved.Contains(otherChar)) Then       'if other char was not already removed on a previous pass . . .
-                                listOfMatchingCharsWithInnerCharRemoved.Remove(otherChar)               'then remove other char
-                            End If
-
-                        End If
-                    End If
-                End If
-            Next
-        Next
-
-        Return listOfMatchingCharsWithInnerCharRemoved
     End Function
 
 End Module

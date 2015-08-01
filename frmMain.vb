@@ -3,9 +3,11 @@
 'using Emgu CV 2.4.10
 
 'add the following components to your form:
+'tableLayoutPanel (TableLayoutPanel)
 'btnOpenFile (Button)
 'lblChosenFile (Label)
 'ibOriginal (TextBox)
+'ckbShowSteps (CheckBox)
 'ofdOpenFile (OpenFileDialog)
 
 Option Explicit On      'require explicit declaration of variables, this is NOT Python !!
@@ -20,7 +22,29 @@ Imports Emgu.CV.UI                  '
 Public Class frmMain
 
     ' module level variables ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-    Dim listOfPossiblePlates As List(Of PossiblePlate) = New List(Of PossiblePlate)
+    Const IMAGE_BOX_PCT_SHOW_STEPS_NOT_CHECKED As Single = 75
+    Const TEXT_BOX_PCT_SHOW_STEPS_NOT_CHECKED  As Single = 25
+
+    Const IMAGE_BOX_PCT_SHOW_STEPS_CHECKED As Single = 55
+    Const TEXT_BOX_PCT_SHOW_STEPS_CHECKED As Single = 45
+
+    'Dim listOfPossiblePlates As List(Of PossiblePlate) = New List(Of PossiblePlate)
+
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    Private Sub frmMain_Load( sender As Object,  e As EventArgs) Handles MyBase.Load
+        ckbShowSteps_CheckedChanged(New Object, New EventArgs)
+    End Sub
+
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    Private Sub ckbShowSteps_CheckedChanged( sender As Object,  e As EventArgs) Handles ckbShowSteps.CheckedChanged
+        If (ckbShowSteps.Checked = False) Then
+            tableLayoutPanel.RowStyles.Item(1).Height = IMAGE_BOX_PCT_SHOW_STEPS_NOT_CHECKED
+            tableLayoutPanel.RowStyles.Item(2).Height = TEXT_BOX_PCT_SHOW_STEPS_NOT_CHECKED
+        ElseIf (ckbShowSteps.Checked = True) Then
+            tableLayoutPanel.RowStyles.Item(1).Height = IMAGE_BOX_PCT_SHOW_STEPS_CHECKED
+            tableLayoutPanel.RowStyles.Item(2).Height = TEXT_BOX_PCT_SHOW_STEPS_CHECKED
+        End If
+    End Sub
 
     '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
     Private Sub btnOpenFile_Click( sender As Object,  e As EventArgs) Handles btnOpenFile.Click
@@ -49,13 +73,12 @@ Public Class frmMain
 
         lblChosenFile.Text = ofdOpenFile.FileName           'update label with file name
 
-        For i As Integer = 0 To listOfPossiblePlates.Count - 1                  'close any windows that were open from the
-            CvInvoke.cvDestroyWindow("imgThresh" + i.ToString)          'previous time this function was called
-        Next
+        CvInvoke.cvDestroyWindow("final imgPlate")
+        CvInvoke.cvDestroyWindow("final imgThresh")
 
         ibOriginal.Image = imgOriginal              'show original image on main form
 
-        listOfPossiblePlates = DetectPlates.detectPlates(imgOriginal)
+        Dim listOfPossiblePlates As List(Of PossiblePlate) = DetectPlates.detectPlates(imgOriginal)
 
         Dim blnKNNTrainingSuccessful As Boolean = loadKNNDataAndTrainKNN()
 
@@ -92,13 +115,18 @@ Public Class frmMain
             imgOriginal.Draw(licPlate.b2dLocationOfPlateInScene, New Bgr(Color.Red), 2)         'draw red rectangle around plate
 
             txtInfo.AppendText(vbCrLf + "license plate read from image = " + licPlate.strChars + vbCrLf)        'update info text box with license plate read
-            
-                                'choose point to start writing chars
-            Dim ptBottomLeftOfFirstChar As New Point(CInt(licPlate.b2dLocationOfPlateInScene.center.X - licPlate.b2dLocationOfPlateInScene.size.Width / 2.0), _
-                                                     CInt(licPlate.b2dLocationOfPlateInScene.center.Y + (licPlate.b2dLocationOfPlateInScene.size.Height * 1.5)))
+            txtInfo.AppendText(vbCrLf + "----------------------------------------" + vbCrLf)
 
             Dim font As MCvFont = New MCvFont(CvEnum.FONT.CV_FONT_HERSHEY_SIMPLEX, 2.0, 2.0)        'use plane jane font
             font.thickness = 3                                                                      'make text bold
+
+            Dim textSize As Size
+            Dim intBaseline As Integer
+
+            CvInvoke.cvGetTextSize(licPlate.strChars, font, textSize, intBaseline)
+
+            Dim ptBottomLeftOfFirstChar As New Point(CInt(licPlate.b2dLocationOfPlateInScene.center.X - CSng(textSize.Width) / 2.0), _
+                                                     CInt(licPlate.b2dLocationOfPlateInScene.center.Y + licPlate.b2dLocationOfPlateInScene.size.Height + CSng(textSize.Height)))
 
             imgOriginal.Draw(licPlate.strChars, font, ptBottomLeftOfFirstChar, New Bgr(Color.Yellow))       'write text of license plate on the image
 
@@ -108,3 +136,5 @@ Public Class frmMain
     End Sub
 
 End Class
+
+

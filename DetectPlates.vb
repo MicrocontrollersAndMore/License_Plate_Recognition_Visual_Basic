@@ -22,15 +22,17 @@ Module DetectPlates
         Dim imgContours As Image(Of Bgr, Byte) = Nothing        'this is only used for showing steps
         Dim random As New Random()                              'this is only used for showing steps
 
-        If (frmMain.ckbShowSteps.Checked = True) Then
-            CvInvoke.cvShowImage("1 - imgOriginal at beginning", imgOriginal)
+        closePreviousShowStepsWindows()
+
+        If (frmMain.ckbShowSteps.Checked = True) Then    
+            CvInvoke.cvShowImage("0", imgOriginal)
         End If
 
         Preprocess.preprocess(imgOriginal, imgGrayscale, imgThresh)
 
         If (frmMain.ckbShowSteps.Checked = True) Then
-            CvInvoke.cvShowImage("2a - just after preprocess of entire image, imgGrayscale", imgGrayscale)
-            CvInvoke.cvShowImage("2b - just after preprocess of entire image, imgThresh", imgThresh)
+            CvInvoke.cvShowImage("1a", imgGrayscale)
+            CvInvoke.cvShowImage("1b", imgThresh)
         End If
 
         Dim listOfPossibleChars As List(Of PossibleChar) = findPossibleCharsInScene(imgThresh)
@@ -41,7 +43,7 @@ Module DetectPlates
             For Each possibleChar As PossibleChar In listOfPossibleChars
                 CvInvoke.cvDrawContours(imgContours, possibleChar.contour, New MCvScalar(255, 255, 255), New MCvScalar(255, 255, 255), 100, 1, LINE_TYPE.CV_AA, New Point(0, 0))
             Next
-            CvInvoke.cvShowImage("3 - just after findPossibleCharsInScene, listOfPossibleChars contours are:", imgContours)
+            CvInvoke.cvShowImage("2b", imgContours)
         End If
 
         Dim listOfListsOfMatchingChars As List(Of List(Of PossibleChar)) = findListOfListsOfMatchingChars(listOfPossibleChars)
@@ -57,7 +59,7 @@ Module DetectPlates
                     CvInvoke.cvDrawContours(imgContours, matchingChar.contour, New MCvScalar(intRandomBlue, intRandomGreen, intRandomRed), New MCvScalar(intRandomBlue, intRandomGreen, intRandomRed), 100, 1, LINE_TYPE.CV_AA, New Point(0, 0))
                 Next
             Next
-            CvInvoke.cvShowImage("4 - just got listOfListsOfMatchingChars for scene, contours are:", imgContours)
+            CvInvoke.cvShowImage("3", imgContours)
         End If
 
         Dim listOfPossiblePlates As List(Of PossiblePlate) = New List(Of PossiblePlate)
@@ -70,16 +72,21 @@ Module DetectPlates
             End If
         Next
 
+        frmMain.txtInfo.AppendText(vbCrLf + listOfPossiblePlates.Count.ToString + " possible plates found" + vbCrLf)
+
         If (frmMain.ckbShowSteps.Checked = True) Then
-            For Each possiblePlate As PossiblePlate In listOfPossiblePlates
-                imgContours.Draw(possiblePlate.b2dLocationOfPlateInScene, New Bgr(Color.Red), 2)         'draw red rectangle around plate
-            Next
-            CvInvoke.cvShowImage("5a - just got listOfPossiblePlates, contours are:", imgContours)
+            frmMain.txtInfo.AppendText(vbCrLf)
+            CvInvoke.cvShowImage("4a", imgContours)
 
             For i As Integer = 0 To listOfPossiblePlates.Count - 1
-                CvInvoke.cvShowImage("5b - possible plate " + i.ToString, listOfPossiblePlates(i).imgPlate)
+                imgContours.Draw(listOfPossiblePlates(i).b2dLocationOfPlateInScene, New Bgr(Color.Red), 2)         'draw red rectangle around plate
+                CvInvoke.cvShowImage("4a", imgContours)
+                frmMain.txtInfo.AppendText("possible plate " + i.ToString + ", click on any image and press a key to continue . . ." + vbCrLf)
+                CvInvoke.cvShowImage("4b", listOfPossiblePlates(i).imgPlate)
+                CvInvoke.cvWaitKey(0)
             Next
-
+            frmMain.txtInfo.AppendText(vbCrLf + "plate detection complete, click on any image and press a key to begin char recognition . . ." + vbCrLf + vbCrLf)
+            CvInvoke.cvWaitKey(0)
         End If
         
         Return listOfPossiblePlates
@@ -87,16 +94,22 @@ Module DetectPlates
 
     '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
     Function findPossibleCharsInScene(imgThresh As Image(Of Gray, Byte)) As List(Of PossibleChar)
+        Dim imgContours As New Image(Of Gray, Byte)(imgThresh.Size())       'this is only for showing steps
+        Dim intCountOfPossibleChars As Integer = 0                          'this is only for showing steps
+        Dim intCountOfValidPossibleChars As Integer = 0                     'this is only for showing steps
+
         Dim contours As Contour(Of Point) = imgThresh.FindContours(CHAIN_APPROX_METHOD.CV_CHAIN_APPROX_SIMPLE, RETR_TYPE.CV_RETR_LIST)
 
         Dim listOfPossibleChars As List(Of PossibleChar) = New List(Of PossibleChar)()      'this is the return value
 
-        Dim intCountOfPossibleChars As Integer = 0
-        Dim intCountOfValidPossibleChars As Integer = 0
-
         While (Not contours Is Nothing)
             intCountOfPossibleChars = intCountOfPossibleChars + 1
             Dim contour As Contour(Of Point) = contours.ApproxPoly(contours.Perimeter * 0.0001)
+
+            If (frmMain.ckbShowSteps.Checked = True)
+                CvInvoke.cvDrawContours(imgContours, contour, New MCvScalar(255), New MCvScalar(255), 100, 1, LINE_TYPE.CV_AA, New Point(0, 0))
+            End If
+
             Dim possibleChar As PossibleChar = New PossibleChar(contour)
             
             If (possibleChar.checkIfPossibleChar()) Then
@@ -108,8 +121,9 @@ Module DetectPlates
         End While
 
         If (frmMain.ckbShowSteps.Checked) Then
-            frmMain.txtInfo.AppendText(vbCrLf + "3 - intCountOfPossibleChars = " + intCountOfPossibleChars.ToString + vbCrLf)                 '2115 with MCLRNF1 image
-            frmMain.txtInfo.AppendText("3 - intCountOfValidPossibleChars = " + intCountOfValidPossibleChars.ToString + vbCrLf + vbCrLf)       '222 with MCLRNF1 image
+            frmMain.txtInfo.AppendText(vbCrLf + "step 2 - intCountOfPossibleChars = " + intCountOfPossibleChars.ToString + vbCrLf)      '2115 with MCLRNF1 image
+            frmMain.txtInfo.AppendText("step 2 - intCountOfValidPossibleChars = " + intCountOfValidPossibleChars.ToString + vbCrLf)     '174 with MCLRNF1 image
+            CvInvoke.cvShowImage("2a", imgContours)
         End If
 
         Return listOfPossibleChars
@@ -140,6 +154,26 @@ Module DetectPlates
 
         Return possiblePlate
     End Function
+
+    '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+    Sub closePreviousShowStepsWindows()
+        CvInvoke.cvDestroyWindow("0")
+        CvInvoke.cvDestroyWindow("1a")
+        CvInvoke.cvDestroyWindow("1b")
+        CvInvoke.cvDestroyWindow("2")
+        CvInvoke.cvDestroyWindow("3")
+        CvInvoke.cvDestroyWindow("4a")
+        CvInvoke.cvDestroyWindow("4b")
+        CvInvoke.cvDestroyWindow("5a")
+        CvInvoke.cvDestroyWindow("5b")
+        CvInvoke.cvDestroyWindow("5c")
+        CvInvoke.cvDestroyWindow("5d")
+        CvInvoke.cvDestroyWindow("6")
+        CvInvoke.cvDestroyWindow("7")
+        CvInvoke.cvDestroyWindow("8")
+        CvInvoke.cvDestroyWindow("9")
+        CvInvoke.cvDestroyWindow("10")
+    End Sub
 
 End Module
 

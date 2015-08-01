@@ -25,7 +25,6 @@ Public Class PossibleChar
     Const MIN_PIXEL_AREA As Long = 20
 
                             'constants for comparing two chars
-    Const MIN_DIAG_SIZE_MULTIPLE_AWAY As Double = 0.3
     Const MAX_DIAG_SIZE_MULTIPLE_AWAY As Double = 5.0
 
     Const MAX_CHANGE_IN_AREA As Double = 0.5
@@ -110,8 +109,7 @@ Public Class PossibleChar
             Dim dblChangeInWidth As Double = Math.Abs(possibleChar.boundingRect.Width - Me.boundingRect.Width) / Me.boundingRect.Width
             Dim dblChangeInHeight As Double = Math.Abs(possibleChar.boundingRect.Height - Me.boundingRect.Height) / Me.boundingRect.Height
 
-            If (dblDistanceToOtherChar > (Me.dblDiagonalSize * MIN_DIAG_SIZE_MULTIPLE_AWAY) And _
-                dblDistanceToOtherChar < (Me.dblDiagonalSize * MAX_DIAG_SIZE_MULTIPLE_AWAY) And _
+            If (dblDistanceToOtherChar < (Me.dblDiagonalSize * MAX_DIAG_SIZE_MULTIPLE_AWAY) And _
                 dblChangeInArea < MAX_CHANGE_IN_AREA And _
                 dblChangeInWidth < MAX_CHANGE_IN_WIDTH And dblChangeInHeight < MAX_CHANGE_IN_HEIGHT And _
                 Me.angleTo(possibleChar) < MAX_ANGLE_TO) Then

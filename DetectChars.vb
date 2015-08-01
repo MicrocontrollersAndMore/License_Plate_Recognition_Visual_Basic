@@ -39,13 +39,14 @@ Module DetectChars
             Return listOfPossiblePlates                     'return
         End If
                         'at this point we can be sure list of possible plates has at least one plate
-
+        
         For Each possiblePlate As PossiblePlate In listOfPossiblePlates
             Preprocess.preprocess(possiblePlate.imgPlate, possiblePlate.imgGrayscale, possiblePlate.imgThresh)
 
             If (frmMain.ckbShowSteps.Checked = True) Then
-                CvInvoke.cvShowImage("6a - just after preprocess of plate" + intPlateCounter.ToString + ", imgGrayscale", possiblePlate.imgGrayscale)
-                CvInvoke.cvShowImage("6a - just after preprocess of plate" + intPlateCounter.ToString + ", imgGrayscale", possiblePlate.imgThresh)
+                CvInvoke.cvShowImage("5a", possiblePlate.imgPlate)
+                CvInvoke.cvShowImage("5b", possiblePlate.imgGrayscale)
+                CvInvoke.cvShowImage("5c", possiblePlate.imgThresh)
             End If
             
             possiblePlate.imgThresh = possiblePlate.imgThresh.Resize(1.6, INTER.CV_INTER_LINEAR)            'increase size of plate image for easier viewing and char detection
@@ -54,7 +55,7 @@ Module DetectChars
             CvInvoke.cvThreshold(possiblePlate.imgThresh, possiblePlate.imgThresh, 0, 255, THRESH.CV_THRESH_BINARY Or THRESH.CV_THRESH_OTSU)
 
             If (frmMain.ckbShowSteps.Checked = True) Then
-                 CvInvoke.cvShowImage("6b - just after addl' thresh of plate" + intPlateCounter.ToString + ", imgGrayscale", possiblePlate.imgThresh)
+                 CvInvoke.cvShowImage("5d", possiblePlate.imgThresh)
             End If
 
             Dim listOfPossibleChars As List(Of PossibleChar) = findPossibleCharsInPlate(possiblePlate.imgGrayscale, possiblePlate.imgThresh)
@@ -65,7 +66,7 @@ Module DetectChars
                 For Each possibleChar As PossibleChar In listOfPossibleChars
                     CvInvoke.cvDrawContours(imgContours, possibleChar.contour, New MCvScalar(255), New MCvScalar(255), 100, 1, LINE_TYPE.CV_AA, New Point(0, 0))
                 Next
-                CvInvoke.cvShowImage("7 - possible plate " + intPlateCounter.ToString + " listOfPossibleChars", imgContours)
+                CvInvoke.cvShowImage("6", imgContours)
             End If
 
             Dim listOfListsOfMatchingChars As List(Of List(Of PossibleChar)) = findListOfListsOfMatchingChars(listOfPossibleChars)
@@ -81,13 +82,31 @@ Module DetectChars
                         CvInvoke.cvDrawContours(imgContours, matchingChar.contour, New MCvScalar(intRandomBlue, intRandomGreen, intRandomRed), New MCvScalar(intRandomBlue, intRandomGreen, intRandomRed), 100, 1, LINE_TYPE.CV_AA, New Point(0, 0))
                     Next
                 Next
-                CvInvoke.cvShowImage("8 - possible plate " + intPlateCounter.ToString, imgContours)
+                CvInvoke.cvShowImage("7", imgContours)
             End If
 
             If (listOfListsOfMatchingChars Is Nothing) Then
+                If (frmMain.ckbShowSteps.Checked = True) Then
+                    frmMain.txtInfo.AppendText("chars found in plate number " + intPlateCounter.ToString + " = (none), click on any image and press a key to continue . . ." + vbCrLf)
+                    intPlateCounter = intPlateCounter + 1
+                    CvInvoke.cvDestroyWindow("8")
+                    CvInvoke.cvDestroyWindow("9")
+                    CvInvoke.cvDestroyWindow("10")
+                    CvInvoke.cvWaitKey(0)
+                End If
+
                 possiblePlate.strChars = ""
                 Continue For
             ElseIf (listOfListsOfMatchingChars.Count = 0) Then
+                If (frmMain.ckbShowSteps.Checked = True) Then
+                    frmMain.txtInfo.AppendText("chars found in plate number " + intPlateCounter.ToString + " = (none), click on any image and press a key to continue . . ." + vbCrLf)
+                    intPlateCounter = intPlateCounter + 1
+                    CvInvoke.cvDestroyWindow("8")
+                    CvInvoke.cvDestroyWindow("9")
+                    CvInvoke.cvDestroyWindow("10")
+                    CvInvoke.cvWaitKey(0)
+                End If
+
                 possiblePlate.strChars = ""
                 Continue For
             End If
@@ -108,7 +127,7 @@ Module DetectChars
                         CvInvoke.cvDrawContours(imgContours, matchingChar.contour, New MCvScalar(intRandomBlue, intRandomGreen, intRandomRed), New MCvScalar(intRandomBlue, intRandomGreen, intRandomRed), 100, 1, LINE_TYPE.CV_AA, New Point(0, 0))
                     Next
                 Next
-                CvInvoke.cvShowImage("9 - possible plate " + intPlateCounter.ToString, imgContours)
+                CvInvoke.cvShowImage("8", imgContours)
             End If
 
                     'within each possible plate, suppose the longest list of potential matching chars is the actual list of chars
@@ -131,16 +150,22 @@ Module DetectChars
                 For Each matchingChar As PossibleChar In longestListOfMatchingChars
                     CvInvoke.cvDrawContours(imgContours, matchingChar.contour, New MCvScalar(255), New MCvScalar(255), 100, 1, LINE_TYPE.CV_AA, New Point(0, 0))
                 Next
-                CvInvoke.cvShowImage("10 - longest list of matching chars " + intPlateCounter.ToString, imgContours)
+                CvInvoke.cvShowImage("9", imgContours)
             End If
 
             possiblePlate.strChars = recognizeChars(possiblePlate.imgThresh, longestListOfMatchingChars)
 
             If (frmMain.ckbShowSteps.Checked = True) Then
-                frmMain.txtInfo.AppendText("chars found in plate " + intPlateCounter.ToString + " = " + possiblePlate.strChars + vbCrLf)
+                frmMain.txtInfo.AppendText("chars found in plate number " + intPlateCounter.ToString + " = " + possiblePlate.strChars + ", click on any image and press a key to continue . . ." + vbCrLf)
                 intPlateCounter = intPlateCounter + 1
+                CvInvoke.cvWaitKey(0)
             End If
         Next
+
+        If (frmMain.ckbShowSteps.Checked = True) Then
+            frmMain.txtInfo.AppendText(vbCrLf + "char detection complete, click on any image and press a key to continue . . ." + vbCrLf)
+            CvInvoke.cvWaitKey(0)
+        End If
 
         Return listOfPossiblePlates
     End Function
@@ -192,10 +217,6 @@ Module DetectChars
             End If
                                                                     'if we get here, the current list passed test as a "group" or "cluster" of matching chars
             listOfListsOfMatchingChars.Add(listOfMatchingChars)     'so add to our list of lists of matching chars
-
-            'If (frmMain.ckbShowSteps.Checked) Then
-            '    frmMain.txtInfo.AppendText(listOfMatchingChars.Count.ToString + vbCrLf)
-            'End If
 
             Dim listOfPossibleCharsWithCurrentMatchesRemoved As List(Of PossibleChar) = listOfPossibleChars.Except(listOfMatchingChars).ToList()
 
@@ -275,11 +296,9 @@ Module DetectChars
             strChars = strChars + Chr(Convert.ToInt32(sngCurrentChar))
         Next
         
-        'If (frmMain.ckbShowSteps.Checked = True) Then
-        '    CvInvoke.cvShowImage("imgTestingNumbers", imgThreshColor)        'show input image with green boxes drawn around found digits
-        '    frmMain.txtInfo.AppendText(vbCrLf + "showing images, press a key to continue . . . " + vbCrLf)
-        '    CvInvoke.cvWaitKey(0)
-        'End If
+        If (frmMain.ckbShowSteps.Checked = True) Then
+            CvInvoke.cvShowImage("10", imgThreshColor)
+        End If
 
         Return strChars
     End Function

@@ -6,7 +6,8 @@
 'tableLayoutPanel (TableLayoutPanel)
 'btnOpenFile (Button)
 'lblChosenFile (Label)
-'ibOriginal (TextBox)
+'ibOriginal (ImageBox)
+'txtInfo (TextBox)
 'ckbShowSteps (CheckBox)
 'ofdOpenFile (OpenFileDialog)
 

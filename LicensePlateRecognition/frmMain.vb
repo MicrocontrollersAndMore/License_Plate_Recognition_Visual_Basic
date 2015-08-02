@@ -8,7 +8,7 @@
 'lblChosenFile (Label)
 'ibOriginal (ImageBox)
 'txtInfo (TextBox)
-'ckbShowSteps (CheckBox)
+'cbShowSteps (CheckBox)
 'ofdOpenFile (OpenFileDialog)
 
 Option Explicit On      'require explicit declaration of variables, this is NOT Python !!
@@ -31,11 +31,11 @@ Public Class frmMain
 
     '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
     Private Sub frmMain_Load( sender As Object,  e As EventArgs) Handles MyBase.Load
-        ckbShowSteps_CheckedChanged(New Object, New EventArgs)
+        cbShowSteps_CheckedChanged(New Object, New EventArgs)
     End Sub
 
     '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-    Private Sub ckbShowSteps_CheckedChanged( sender As Object,  e As EventArgs) Handles cbShowSteps.CheckedChanged
+    Private Sub cbShowSteps_CheckedChanged( sender As Object,  e As EventArgs) Handles cbShowSteps.CheckedChanged
         If (cbShowSteps.Checked = False) Then
             tableLayoutPanel.RowStyles.Item(1).Height = IMAGE_BOX_PCT_SHOW_STEPS_NOT_CHECKED
             tableLayoutPanel.RowStyles.Item(2).Height = TEXT_BOX_PCT_SHOW_STEPS_NOT_CHECKED

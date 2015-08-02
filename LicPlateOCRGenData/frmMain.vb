@@ -198,25 +198,6 @@ Public Class frmMain
 
         txtInfo.Text = vbCrLf + txtInfo.Text + "file writing done" + vbCrLf
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     End Sub
+
 End Class

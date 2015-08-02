@@ -16,42 +16,42 @@ Module DetectPlates
     Const PLATE_HEIGHT_PADDING_FACTOR As Double = 1.5
     
     '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-    Function detectPlates(imgOriginal As Image(Of Bgr, Byte)) As List(Of PossiblePlate)
-        Dim imgGrayscale As Image(Of Gray, Byte) = Nothing
-        Dim imgThresh As Image(Of Gray, Byte) = Nothing
+    Function detectPlatesInScene(imgOriginalScene As Image(Of Bgr, Byte)) As List(Of PossiblePlate)
+        Dim imgGrayscaleScene As Image(Of Gray, Byte) = Nothing
+        Dim imgThreshScene As Image(Of Gray, Byte) = Nothing
         Dim imgContours As Image(Of Bgr, Byte) = Nothing        'this is only used for showing steps
         Dim random As New Random()                              'this is only used for showing steps
 
         closePreviousShowStepsWindows()
 
-        If (frmMain.ckbShowSteps.Checked = True) Then    
-            CvInvoke.cvShowImage("0", imgOriginal)
+        If (frmMain.cbShowSteps.Checked = True) Then    
+            CvInvoke.cvShowImage("0", imgOriginalScene)
         End If
 
-        Preprocess.preprocess(imgOriginal, imgGrayscale, imgThresh)
+        Preprocess.preprocess(imgOriginalScene, imgGrayscaleScene, imgThreshScene)
 
-        If (frmMain.ckbShowSteps.Checked = True) Then
-            CvInvoke.cvShowImage("1a", imgGrayscale)
-            CvInvoke.cvShowImage("1b", imgThresh)
+        If (frmMain.cbShowSteps.Checked = True) Then
+            CvInvoke.cvShowImage("1a", imgGrayscaleScene)
+            CvInvoke.cvShowImage("1b", imgThreshScene)
         End If
 
-        Dim listOfPossibleChars As List(Of PossibleChar) = findPossibleCharsInScene(imgThresh)
+        Dim listOfPossibleCharsInScene As List(Of PossibleChar) = findPossibleCharsInScene(imgThreshScene)
 
-        If (frmMain.ckbShowSteps.Checked = True) Then
-            imgContours = New Image(Of Bgr, Byte)(imgOriginal.Size())
+        If (frmMain.cbShowSteps.Checked = True) Then
+            imgContours = New Image(Of Bgr, Byte)(imgOriginalScene.Size())
 
-            For Each possibleChar As PossibleChar In listOfPossibleChars
+            For Each possibleChar As PossibleChar In listOfPossibleCharsInScene
                 CvInvoke.cvDrawContours(imgContours, possibleChar.contour, New MCvScalar(255, 255, 255), New MCvScalar(255, 255, 255), 100, 1, LINE_TYPE.CV_AA, New Point(0, 0))
             Next
             CvInvoke.cvShowImage("2b", imgContours)
         End If
 
-        Dim listOfListsOfMatchingChars As List(Of List(Of PossibleChar)) = findListOfListsOfMatchingChars(listOfPossibleChars)
+        Dim listOfListsOfMatchingCharsInScene As List(Of List(Of PossibleChar)) = findListOfListsOfMatchingChars(listOfPossibleCharsInScene)
 
-        If (frmMain.ckbShowSteps.Checked = True) Then
-            imgContours = New Image(Of Bgr, Byte)(imgOriginal.Size())           're-instantiate imgContours to clear it
+        If (frmMain.cbShowSteps.Checked = True) Then
+            imgContours = New Image(Of Bgr, Byte)(imgOriginalScene.Size())           're-instantiate imgContours to clear it
 
-            For Each listOfMatchingChars As List(Of PossibleChar) In listOfListsOfMatchingChars
+            For Each listOfMatchingChars As List(Of PossibleChar) In listOfListsOfMatchingCharsInScene
                 Dim intRandomBlue = random.Next(0, 256)
                 Dim intRandomGreen = random.Next(0, 256)
                 Dim intRandomRed = random.Next(0, 256)
@@ -62,10 +62,10 @@ Module DetectPlates
             CvInvoke.cvShowImage("3", imgContours)
         End If
 
-        Dim listOfPossiblePlates As List(Of PossiblePlate) = New List(Of PossiblePlate)
+        Dim listOfPossiblePlates As List(Of PossiblePlate) = New List(Of PossiblePlate)         'this will be the return value
 
-        For Each listOfMatchingChars As List(Of PossibleChar) In listOfListsOfMatchingChars
-            Dim possiblePlate = extractPlate(imgOriginal, listOfMatchingChars)
+        For Each listOfMatchingChars As List(Of PossibleChar) In listOfListsOfMatchingCharsInScene
+            Dim possiblePlate = extractPlate(imgOriginalScene, listOfMatchingChars)
 
             If (Not possiblePlate.imgPlate Is Nothing) Then
                 listOfPossiblePlates.Add(possiblePlate)
@@ -74,7 +74,7 @@ Module DetectPlates
 
         frmMain.txtInfo.AppendText(vbCrLf + listOfPossiblePlates.Count.ToString + " possible plates found" + vbCrLf)
 
-        If (frmMain.ckbShowSteps.Checked = True) Then
+        If (frmMain.cbShowSteps.Checked = True) Then
             frmMain.txtInfo.AppendText(vbCrLf)
             CvInvoke.cvShowImage("4a", imgContours)
 
@@ -106,13 +106,13 @@ Module DetectPlates
             intCountOfPossibleChars = intCountOfPossibleChars + 1
             Dim contour As Contour(Of Point) = contours.ApproxPoly(contours.Perimeter * 0.0001)
 
-            If (frmMain.ckbShowSteps.Checked = True)
+            If (frmMain.cbShowSteps.Checked = True)
                 CvInvoke.cvDrawContours(imgContours, contour, New MCvScalar(255), New MCvScalar(255), 100, 1, LINE_TYPE.CV_AA, New Point(0, 0))
             End If
 
             Dim possibleChar As PossibleChar = New PossibleChar(contour)
             
-            If (possibleChar.checkIfPossibleChar()) Then
+            If (checkIfPossibleChar(possibleChar)) Then
                 intCountOfValidPossibleChars = intCountOfValidPossibleChars + 1
                 listOfPossibleChars.Add(possibleChar)
             End If
@@ -120,7 +120,7 @@ Module DetectPlates
             contours = contours.HNext
         End While
 
-        If (frmMain.ckbShowSteps.Checked) Then
+        If (frmMain.cbShowSteps.Checked) Then
             frmMain.txtInfo.AppendText(vbCrLf + "step 2 - intCountOfPossibleChars = " + intCountOfPossibleChars.ToString + vbCrLf)      '2115 with MCLRNF1 image
             frmMain.txtInfo.AppendText("step 2 - intCountOfValidPossibleChars = " + intCountOfValidPossibleChars.ToString + vbCrLf)     '174 with MCLRNF1 image
             CvInvoke.cvShowImage("2a", imgContours)
@@ -144,7 +144,7 @@ Module DetectPlates
         Dim intPlateHeight As Integer = CInt(listOfMatchingChars(0).dblDiagonalSize * PLATE_HEIGHT_PADDING_FACTOR)
 
         Dim sngOpposite = CSng(listOfMatchingChars(listOfMatchingChars.Count - 1).lngCenterY - listOfMatchingChars(0).lngCenterY)
-        Dim sngHypotenuse = CSng(listOfMatchingChars(0).distanceTo(listOfMatchingChars(listOfMatchingChars.Count - 1)))
+        Dim sngHypotenuse = CSng(distanceBetweenChars(listOfMatchingChars(0), listOfMatchingChars(listOfMatchingChars.Count - 1)))
         Dim sngAngleInRad = CSng(Math.Asin(sngOpposite / sngHypotenuse))
         Dim sngAngleInDeg As Single = sngAngleInRad * CSng(180.0 / Math.PI)
 
@@ -160,7 +160,8 @@ Module DetectPlates
         CvInvoke.cvDestroyWindow("0")
         CvInvoke.cvDestroyWindow("1a")
         CvInvoke.cvDestroyWindow("1b")
-        CvInvoke.cvDestroyWindow("2")
+        CvInvoke.cvDestroyWindow("2a")
+        CvInvoke.cvDestroyWindow("2b")
         CvInvoke.cvDestroyWindow("3")
         CvInvoke.cvDestroyWindow("4a")
         CvInvoke.cvDestroyWindow("4b")

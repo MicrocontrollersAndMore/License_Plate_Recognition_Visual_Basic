@@ -28,19 +28,17 @@ Public Class frmMain
     Const IMAGE_BOX_PCT_SHOW_STEPS_CHECKED As Single = 55
     Const TEXT_BOX_PCT_SHOW_STEPS_CHECKED As Single = 45
 
-    'Dim listOfPossiblePlates As List(Of PossiblePlate) = New List(Of PossiblePlate)
-
     '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
     Private Sub frmMain_Load( sender As Object,  e As EventArgs) Handles MyBase.Load
         ckbShowSteps_CheckedChanged(New Object, New EventArgs)
     End Sub
 
     '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-    Private Sub ckbShowSteps_CheckedChanged( sender As Object,  e As EventArgs) Handles ckbShowSteps.CheckedChanged
-        If (ckbShowSteps.Checked = False) Then
+    Private Sub ckbShowSteps_CheckedChanged( sender As Object,  e As EventArgs) Handles cbShowSteps.CheckedChanged
+        If (cbShowSteps.Checked = False) Then
             tableLayoutPanel.RowStyles.Item(1).Height = IMAGE_BOX_PCT_SHOW_STEPS_NOT_CHECKED
             tableLayoutPanel.RowStyles.Item(2).Height = TEXT_BOX_PCT_SHOW_STEPS_NOT_CHECKED
-        ElseIf (ckbShowSteps.Checked = True) Then
+        ElseIf (cbShowSteps.Checked = True) Then
             tableLayoutPanel.RowStyles.Item(1).Height = IMAGE_BOX_PCT_SHOW_STEPS_CHECKED
             tableLayoutPanel.RowStyles.Item(2).Height = TEXT_BOX_PCT_SHOW_STEPS_CHECKED
         End If
@@ -57,16 +55,16 @@ Public Class frmMain
             Return                                              'and exit function
         End If
 
-        Dim imgOriginal As Image(Of Bgr, Byte)           'this is the main input image
+        Dim imgOriginalScene As Image(Of Bgr, Byte)           'this is the main input image
 
         Try
-            imgOriginal = New Image(Of Bgr, Byte)(ofdOpenFile.FileName)             'open image
+            imgOriginalScene = New Image(Of Bgr, Byte)(ofdOpenFile.FileName)             'open image
         Catch ex As Exception                                                       'if error occurred
             lblChosenFile.Text = "unable to open image, error: " + ex.Message       'show error message on label
             Return                                                                  'and exit function
         End Try
         
-        If imgOriginal Is Nothing Then                                  'if image could not be opened
+        If imgOriginalScene Is Nothing Then                                  'if image could not be opened
             lblChosenFile.Text = "unable to open image"                 'show error message on label
             Return                                                      'and exit function
         End If
@@ -76,9 +74,9 @@ Public Class frmMain
         CvInvoke.cvDestroyWindow("final imgPlate")
         CvInvoke.cvDestroyWindow("final imgThresh")
 
-        ibOriginal.Image = imgOriginal              'show original image on main form
+        ibOriginal.Image = imgOriginalScene              'show original image on main form
 
-        Dim listOfPossiblePlates As List(Of PossiblePlate) = DetectPlates.detectPlates(imgOriginal)
+        Dim listOfPossiblePlates As List(Of PossiblePlate) = DetectPlates.detectPlatesInScene(imgOriginalScene)
 
         Dim blnKNNTrainingSuccessful As Boolean = loadKNNDataAndTrainKNN()
 
@@ -87,7 +85,7 @@ Public Class frmMain
             Return
         End If
 
-        listOfPossiblePlates = DetectChars.detectChars(listOfPossiblePlates)
+        listOfPossiblePlates = DetectChars.detectCharsInPlates(listOfPossiblePlates)
 
         If (listOfPossiblePlates Is Nothing) Then
             txtInfo.AppendText(vbCrLf + "no license plates were detected" + vbCrLf)
@@ -112,7 +110,7 @@ Public Class frmMain
                 Return                                                                                      'and return
             End If
 
-            imgOriginal.Draw(licPlate.b2dLocationOfPlateInScene, New Bgr(Color.Red), 2)         'draw red rectangle around plate
+            imgOriginalScene.Draw(licPlate.b2dLocationOfPlateInScene, New Bgr(Color.Red), 2)         'draw red rectangle around plate
 
             txtInfo.AppendText(vbCrLf + "license plate read from image = " + licPlate.strChars + vbCrLf)        'update info text box with license plate read
             txtInfo.AppendText(vbCrLf + "----------------------------------------" + vbCrLf)
@@ -120,17 +118,17 @@ Public Class frmMain
             Dim font As MCvFont = New MCvFont(CvEnum.FONT.CV_FONT_HERSHEY_SIMPLEX, 2.0, 2.0)        'use plane jane font
             font.thickness = 3                                                                      'make text bold
 
-            Dim textSize As Size
-            Dim intBaseline As Integer
+            Dim textSize As Size                'variable to hold the size the text will occupy on the image
 
-            CvInvoke.cvGetTextSize(licPlate.strChars, font, textSize, intBaseline)
+            CvInvoke.cvGetTextSize(licPlate.strChars, font, textSize, 0)      'get the size the text will be so we can correctly position the chars
 
+                                                    'determine the starting point on the image for writing the chars
             Dim ptBottomLeftOfFirstChar As New Point(CInt(licPlate.b2dLocationOfPlateInScene.center.X - CSng(textSize.Width) / 2.0), _
                                                      CInt(licPlate.b2dLocationOfPlateInScene.center.Y + licPlate.b2dLocationOfPlateInScene.size.Height + CSng(textSize.Height)))
 
-            imgOriginal.Draw(licPlate.strChars, font, ptBottomLeftOfFirstChar, New Bgr(Color.Yellow))       'write text of license plate on the image
+            imgOriginalScene.Draw(licPlate.strChars, font, ptBottomLeftOfFirstChar, New Bgr(Color.Yellow))       'write text of license plate on the image
 
-            ibOriginal.Image = imgOriginal              'update form with updated original image
+            ibOriginal.Image = imgOriginalScene              'update form with updated original image
         End If
 
     End Sub

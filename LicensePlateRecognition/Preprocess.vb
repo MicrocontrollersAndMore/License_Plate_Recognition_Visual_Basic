@@ -36,7 +36,7 @@ Module Preprocess
 
         Return imgValue
     End Function
-
+    
     '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
     Function maximizeContrast(imgGrayscale As Image(Of Gray, Byte)) As Image(Of Gray, Byte)
         Dim imgTopHat As Image(Of Gray, Byte)
@@ -44,13 +44,13 @@ Module Preprocess
         Dim imgGrayscalePlusTopHat As Image(Of Gray, Byte)
         Dim imgGrayscalePlusTopHatMinusBlackHat As Image(Of Gray, Byte)
 
-        Dim structuringElementEx As StructuringElementEx = New StructuringElementEx(3, 3, 1, 1, CV_ELEMENT_SHAPE.CV_SHAPE_ELLIPSE)
+        Dim structuringElementEx As StructuringElementEx = New StructuringElementEx(3, 3, 1, 1, CV_ELEMENT_SHAPE.CV_SHAPE_RECT)
 
         imgTopHat = imgGrayscale.MorphologyEx(structuringElementEx, CV_MORPH_OP.CV_MOP_TOPHAT, 1)
         imgBlackHat = imgGrayscale.MorphologyEx(structuringElementEx, CV_MORPH_OP.CV_MOP_BLACKHAT, 1)
 
-        imgGrayscalePlusTopHat = imgGrayscale.Add(imgTopHat)
-        imgGrayscalePlusTopHatMinusBlackHat = imgGrayscalePlusTopHat.Sub(imgBlackHat)
+        imgGrayscalePlusTopHat = imgGrayscale + imgTopHat
+        imgGrayscalePlusTopHatMinusBlackHat = imgGrayscalePlusTopHat - imgBlackHat
 
         Return imgGrayscalePlusTopHatMinusBlackHat
     End Function

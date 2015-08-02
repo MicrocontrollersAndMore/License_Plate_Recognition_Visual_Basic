@@ -1,4 +1,6 @@
 ﻿'DetectPlates.vb
+'
+'Emgu CV 2.4.10
 
 Option Explicit On      'require explicit declaration of variables, this is NOT Python !!
 Option Strict On        'restrict implicit data type conversions to only widening conversions
@@ -133,24 +135,29 @@ Module DetectPlates
     Function extractPlate(imgOriginal As Image(Of Bgr, Byte), listOfMatchingChars As List(Of PossibleChar)) As PossiblePlate
         Dim possiblePlate As PossiblePlate = New PossiblePlate          'this will be the return value
 
+                                                'sort chars from left to right based on x position
         listOfMatchingChars.Sort(Function(firstChar, secondChar) firstChar.lngCenterX.CompareTo(secondChar.lngCenterX))
 
+                                                'calculate the center point of the plate
         Dim sngPlateCenterX As Single = CSng(CSng(listOfMatchingChars(0).lngCenterX + listOfMatchingChars(listOfMatchingChars.Count - 1).lngCenterX) / 2.0)
         Dim sngPlateCenterY As Single = CSng(CSng(listOfMatchingChars(0).lngCenterY + listOfMatchingChars(listOfMatchingChars.Count - 1).lngCenterY) / 2.0)
-
         Dim ptfPlateCenter As PointF = New PointF(sngPlateCenterX, sngPlateCenterY)
 
+                                                'calculate plate width and height
         Dim intPlateWidth As Integer = CInt((listOfMatchingChars(listOfMatchingChars.Count-1).boundingRect.Right - listOfMatchingChars(0).boundingRect.Left) * PLATE_WIDTH_PADDING_FACTOR)
         Dim intPlateHeight As Integer = CInt(listOfMatchingChars(0).dblDiagonalSize * PLATE_HEIGHT_PADDING_FACTOR)
 
+                                                'calculate correction angle of plate region
         Dim sngOpposite = CSng(listOfMatchingChars(listOfMatchingChars.Count - 1).lngCenterY - listOfMatchingChars(0).lngCenterY)
         Dim sngHypotenuse = CSng(distanceBetweenChars(listOfMatchingChars(0), listOfMatchingChars(listOfMatchingChars.Count - 1)))
-        Dim sngAngleInRad = CSng(Math.Asin(sngOpposite / sngHypotenuse))
-        Dim sngAngleInDeg As Single = sngAngleInRad * CSng(180.0 / Math.PI)
+        Dim sngCorrectionAngleInRad = CSng(Math.Asin(sngOpposite / sngHypotenuse))
+        Dim sngCorrectionAngleInDeg As Single = sngCorrectionAngleInRad * CSng(180.0 / Math.PI)
 
-        possiblePlate.b2dLocationOfPlateInScene = New MCvBox2D(ptfPlateCenter, New SizeF(CSng(intPlateWidth), CSng(intPlateHeight)), sngAngleInDeg)
+                                                'calculate bounding rect of plate region,
+                                                'use MCvBox2D so rect can be tilted by correction angle (type Rectangle cannot be tilted)
+        possiblePlate.b2dLocationOfPlateInScene = New MCvBox2D(ptfPlateCenter, New SizeF(CSng(intPlateWidth), CSng(intPlateHeight)), sngCorrectionAngleInDeg)
 
-        possiblePlate.imgPlate = imgOriginal.Copy(possiblePlate.b2dLocationOfPlateInScene)
+        possiblePlate.imgPlate = imgOriginal.Copy(possiblePlate.b2dLocationOfPlateInScene)      'assign crop of plate region to return variable
 
         Return possiblePlate
     End Function

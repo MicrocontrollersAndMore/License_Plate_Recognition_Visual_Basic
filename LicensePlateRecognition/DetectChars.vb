@@ -1,4 +1,6 @@
-﻿'DetectPlates.vb
+﻿'DetectChars.vb
+'
+'Emgu CV 2.4.10
 
 Option Explicit On      'require explicit declaration of variables, this is NOT Python !!
 Option Strict On        'restrict implicit data type conversions to only widening conversions
@@ -27,7 +29,7 @@ Module DetectChars
     Const MIN_PIXEL_AREA As Long = 20
 
                                 'constants for comparing two chars
-    Const MIN_DIAG_SIZE_MULTIPLE_AWAY = 0.3
+    Const MIN_DIAG_SIZE_MULTIPLE_AWAY As Double = 0.3
     Const MAX_DIAG_SIZE_MULTIPLE_AWAY As Double = 5.0
 
     Const MAX_CHANGE_IN_AREA As Double = 0.5
@@ -37,11 +39,13 @@ Module DetectChars
 
     Const MAX_ANGLE_BETWEEN_CHARS As Double = 12.0
 
+                                'other constants
     Const MIN_NUMBER_OF_MATCHING_CHARS As Integer = 3
 
     Const RESIZED_CHAR_IMAGE_WIDTH As Integer = 20
     Const RESIZED_CHAR_IMAGE_HEIGHT As Integer = 30
-
+    
+                                'variables
     Dim kNearest As KNearest
 
     Const MIN_CONTOUR_AREA As Integer = 100

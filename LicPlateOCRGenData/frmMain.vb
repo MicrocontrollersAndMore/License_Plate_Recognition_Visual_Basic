@@ -1,8 +1,9 @@
 ﻿'LicPlateOCRGenData.vb
-
-'using Emgu CV 2.4.10
-
+'
+'Emgu CV 2.4.10
+'
 'add the following components to your form:
+'tableLayoutPanel (TableLayoutPanel)
 'btnOpenTrainingImage (Button)
 'lblChosenFile (Label)
 'txtInfo (TextBox)

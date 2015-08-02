@@ -1,4 +1,6 @@
-﻿'PossiblePlateStruct.vb
+﻿'PossiblePlate.vb
+'
+'Emgu CV 2.4.10
 
 Option Explicit On      'require explicit declaration of variables, this is NOT Python !!
 Option Strict On        'restrict implicit data type conversions to only widening conversions

@@ -22,7 +22,7 @@ Imports Emgu.CV.UI                  '
 '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 Public Class frmMain
 
-    ' module level variables ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+        ' module level variables ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
     Const IMAGE_BOX_PCT_SHOW_STEPS_NOT_CHECKED As Single = 75
     Const TEXT_BOX_PCT_SHOW_STEPS_NOT_CHECKED  As Single = 25
 
@@ -135,5 +135,6 @@ Public Class frmMain
     End Sub
 
 End Class
+
 
 
